@@ -13,14 +13,18 @@
 
 .logo {
   font-size: 3rem;
-  font-weight: 800;
+  font-weight: 750;
   letter-spacing: -0.06em;
   color: #000;
+}
+
+nav ul {
+  list-style: none;
 }
 
 nav a {
   text-decoration: none;
   color: #000;
-  font-size: 0.9rem;
+  font-size: 14px;
   font-weight: 400;
 }
