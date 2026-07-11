@@ -32,6 +32,13 @@
   transform: translateY(-2px);
 }
 
+.upload-button.disabled {
+  background: #1d1d1d;
+  color: #6a6a6a;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 input[type="file"] {
   display: none;
 }

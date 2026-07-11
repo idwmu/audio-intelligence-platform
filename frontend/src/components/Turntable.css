@@ -1,7 +1,7 @@
 .turntable {
     position: fixed;
 
-    width: 825px;
+    width: 875px;
 
     left: 50%;
     top: 50%;
@@ -21,27 +21,19 @@
 .disk {
     position: absolute;
 
-    left: 68px;   
-    top: 38px;
+    left: 60px;
+    top: 27px;
 
-    width: 354px;
+    width: 274px;
 
     transform-origin: 50% 50%;
     transform-box: fill-box;
 }
 
-.spinning {
-    animation: spin 12s linear infinite;
+/* Rotation while spinning is set inline via JS (style={{ transform }})
+   so the exact angle is known when we hand off to the decel transition
+   below — no keyframe jump between the two states. */
+
+.disk.decelerating {
+    transition: transform 2.4s cubic-bezier(0.15, 0.75, 0.25, 1);
 }
-
-@keyframes spin {
-
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
-
-}   
