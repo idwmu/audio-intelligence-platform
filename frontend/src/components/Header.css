@@ -1,30 +1,60 @@
 .header {
-  width: 100%;
-  height: 110px;
+    width: 100%;
+    height: 110px;
 
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 
-  padding: 0 42px;
+    padding: 0 42px;
 
-  background: #ffffff;
+    background: white;
+}
+
+.logo-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
 }
 
 .logo {
-  font-size: 3rem;
-  font-weight: 750;
-  letter-spacing: -0.06em;
-  color: #000;
+    margin: 0;
+
+    font-size: 3rem;
+    font-weight: 750;
+    letter-spacing: -0.06em;
+    line-height: 1;
+
+    color: black;
 }
 
-nav ul {
-  list-style: none;
+.current-model {
+    margin-top: 6px;
+    margin-left: 2px;
+
+    font-size: 1rem;
+    font-weight: 500;
+
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+
+    color: #666;
 }
 
-nav a {
-  text-decoration: none;
-  color: #000;
-  font-size: 14px;
-  font-weight: 400;
+nav {
+    display: flex;
+    align-items: center;
+}
+
+.model-select {
+    border: none;
+    outline: none;
+    background: transparent;
+
+    font-size: 18px;
+    font-weight: 500;
+
+    cursor: pointer;
+
+    color: black;
 }
