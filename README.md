@@ -60,7 +60,7 @@ Each of the three CNN14 specialist models was fine-tuned separately from the sam
 
 The trained model checkpoints are too large for GitHub, so they're hosted on Google Drive instead:
 
-**[Download models from Google Drive]([PASTE_YOUR_DRIVE_LINK_HERE](https://drive.google.com/drive/folders/1qpSbt0LRVphpCuOEE0PhMWsEdx9o4ED6?usp=sharing))**
+**[Download models from Google Drive]([https://drive.google.com/drive/folders/1qpSbt0LRVphpCuOEE0PhMWsEdx9o4ED6?usp=sharing]))**
 
 Download the folder and place the files into `backend/models/` so the structure matches what `services/model_registry.py` expects:
 
