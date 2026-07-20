@@ -1,62 +1,53 @@
 import torch
-import numpy as np
 
 from models.cnn14 import CNN14
 from services.preprocessing import extract_mel
-
-# -------------------------------
-# Configuration
-# -------------------------------
-
-NUM_CLASSES = 18
-
-MODEL_PATH = "models/best_animal_cnn.pt"
-
-CLASS_NAMES = [
-    "bear",
-    "bird",
-    "cat",
-    "cow",
-    "crow",
-    "dog",
-    "dolphin",
-    "donkey",
-    "elephant",
-    "frog",
-    "hen",
-    "horse",
-    "insects",
-    "lion",
-    "monkey",
-    "pig",
-    "rooster",
-    "sheep"
-]
-
-# -------------------------------
-# Load model once
-# -------------------------------
+from services.model_registry import MODELS
 
 device = torch.device("cpu")
 
-model = CNN14(num_classes=NUM_CLASSES)
+# Stores loaded models
+loaded_models = {}
 
-model.load_state_dict(
-    torch.load(
-        MODEL_PATH,
-        map_location=device
-    )
-)
 
-model.to(device)
-model.eval()
+def load_models():
+    """
+    Load every model into memory when the server starts.
+    """
 
-# -------------------------------
-# Prediction
-# -------------------------------
+    global loaded_models
 
-def predict(audio_path):
+    for model_name, config in MODELS.items():
 
+        model = CNN14(num_classes=len(config["classes"]))
+
+        model.load_state_dict(
+            torch.load(
+                config["weights"],
+                map_location=device
+            )
+        )
+
+        model.to(device)
+        model.eval()
+
+        loaded_models[model_name] = model
+
+    print("Models loaded:", list(loaded_models.keys()))
+
+
+def predict(model_name, audio_path):
+    """
+    Predict the class of an audio file using the selected model.
+    """
+
+    if model_name not in loaded_models:
+        raise ValueError(f"Unknown model: {model_name}")
+
+    model = loaded_models[model_name]
+    class_names = MODELS[model_name]["classes"]
+
+    # Preprocess audio
     mel = extract_mel(audio_path)
 
     mel = torch.tensor(
@@ -64,11 +55,8 @@ def predict(audio_path):
         dtype=torch.float32
     )
 
-    # Add channel dimension
-    mel = mel.unsqueeze(0)
-
-    # Add batch dimension
-    mel = mel.unsqueeze(0)
+    # (256,431) -> (1,1,256,431)
+    mel = mel.unsqueeze(0).unsqueeze(0)
 
     mel = mel.to(device)
 
@@ -76,14 +64,11 @@ def predict(audio_path):
 
         output = model(mel)
 
-        probabilities = torch.softmax(output, dim=1)
+        probs = torch.softmax(output, dim=1)
 
-        confidence, prediction = torch.max(
-            probabilities,
-            dim=1
-        )
+        confidence, prediction = torch.max(probs, dim=1)
 
     return {
-        "prediction": CLASS_NAMES[prediction.item()],
+        "prediction": class_names[prediction.item()],
         "confidence": round(confidence.item() * 100, 2)
     }
