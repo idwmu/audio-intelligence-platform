@@ -1,37 +1,24 @@
 # Whodat — Audio Intelligence Platform
 
-A full-stack audio classifier that identifies whether a sound is an **animal**, a **machine/industrial sound**, or a **human voice** (with gender), and then predicts the specific class within that domain — e.g. "cow," "jackhammer," or "male."
+A full-stack audio classifier that identifies the specific class of a sound within a chosen domain — **animal**, **machine/industrial**, or **human voice (gender)** — e.g. "cow," "jackhammer," or "male."
 
-Built around three independently fine-tuned CNN14 (PANNs) models, combined with a meta-classifier that routes each clip to the right domain before making a final prediction.
+Built around three independently fine-tuned CNN14 (PANNs) models. The user selects which domain to classify against via a dropdown in the UI, and the backend runs inference using that domain's specialist model.
 
 ## How it works
 
 ```
-                ┌───────────────┐
-                │   Audio file   │
-                └───────┬───────┘
-                        │
-                        ▼
-              ┌───────────────────┐
-              │  YAMNet embedding   │
-              │      (frozen)      │
-              └─────────┬──────────┘
-                        ▼
-              ┌───────────────────┐
-              │    Router head     │
-              │  (trained, router_v2) │
-              └─────────┬──────────┘
-                        ▼
-              domain: animal / machine / human
-                        │
-        ┌───────────────┼───────────────┐
-        ▼               ▼               ▼
- ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
- │ Animal CNN14│ │Machine CNN14│ │ Gender CNN14│
- └──────┬──────┘ └──────┬──────┘ └──────┬──────┘
-        └───────────────┼───────────────┘
-                        ▼
-          Predicted domain + class + confidence
+Frontend (React)
+   |
+   |  user selects domain: animal / machine / human
+   |  user uploads audio file
+   v
+POST /predict/{model_name}
+   |
+   v
+FastAPI backend  ->  loads log-mel spectrogram  ->  runs selected domain's CNN14 model
+   |
+   v
+{ prediction: class label, confidence: 0-100 }
 ```
 
 Each of the three CNN14 specialist models was fine-tuned separately from the same pretrained AudioSet backbone (`Cnn14_16k.pth`) on its own dataset:
@@ -42,51 +29,53 @@ Each of the three CNN14 specialist models was fine-tuned separately from the sam
 | **Machine** | air_conditioner, car_horn, drilling, engine_idling, fan, jackhammer, pump, siren, slider, toycar, toyconveyor, valve |
 | **Human** | male, female |
 
-### Domain routing: a trained router, not a confidence comparison
-
-Early versions of this project tried routing by comparing confidence (then energy scores) directly across the three independently trained specialist models — this doesn't work well, because each specialist was only ever trained to be confident within its own class set and has no real concept of "this isn't my domain."
-
-The current router instead is an actual trained model (`router_v2`, trained in the Kaggle notebooks): audio is passed through a frozen YAMNet embedding extractor, and a small trained router head maps that embedding to one of the three domains (animal / machine / human). The winning domain's specialist CNN14 model then produces the final class + confidence. This is a proper learned domain boundary instead of a post-hoc heuristic, and is why routing accuracy improved significantly over the energy-score approach.
+> **Note:** domain selection is currently manual (dropdown in the header), not automatic. An earlier prototype explored automatic domain detection (comparing model confidence, then energy scores, then a trained YAMNet-embedding router) but that isn't part of the current deployed backend. See `SDLC.md` → Future Work for details.
 
 ## Project structure
 
 ```
 .
 ├── backend/
-│   ├── app.py              # Flask API — loads router + 3 specialists, exposes /api/classify
-│   ├── router/              # YAMNet-embedding router head (router_v2)
-│   ├── requirements.txt
-│   └── models/
-│       ├── animal/         # best_animal_cnn.pt, animal_le.pkl
-│       ├── machine/        # machine_cnn14_best.pt, machine_le.pkl
-│       └── human/          # gender_cnn14_best.pt, gender_le.pkl
-├── notebooks/
-│   └── meta_classifier.ipynb  # Training/experimentation notebook (incl. router_v2 training)
+│   ├── app.py                       # FastAPI app, exposes GET / and POST /predict/{model_name}
+│   ├── models/
+│   │   └── cnn14.py                 # CNN14 architecture
+│   ├── services/
+│   │   ├── inference.py             # Loads all 3 models at startup, runs prediction
+│   │   ├── model_registry.py        # Maps domain name -> checkpoint path + class list
+│   │   └── preprocessing.py         # Log-mel spectrogram extraction
+│   └── test_preprocessing.py        # Manual smoke test for preprocessing
 └── frontend/
-    ├── src/
-    │   ├── App.jsx
-    │   └── components/
-    │       ├── Header.jsx
-    │       ├── Turntable.jsx    # Animated turntable, spins while processing
-    │       ├── Upload.jsx       # Uploads audio, calls the backend API
-    │       └── Results.jsx      # Displays domain, prediction, confidence
-    └── package.json
+    └── src/
+        ├── App.jsx
+        └── components/
+            ├── Header.jsx           # Logo + domain selector dropdown
+            ├── Turntable.jsx        # Animated turntable, spins while processing
+            ├── Upload.jsx           # Uploads audio, calls the backend API
+            └── Screen.jsx           # Displays prediction + confidence
 ```
 
 ## Getting started
 
 ### 1. Get the model files
 
-Each domain's fine-tuned checkpoint + label encoder needs to be downloaded from Kaggle and placed into the matching `backend/models/<domain>/` folder:
+The trained model checkpoints are too large for GitHub, so they're hosted on Google Drive instead:
+
+**[Download models from Google Drive](PASTE_YOUR_DRIVE_LINK_HERE)**
+
+Download the folder and place the files into `backend/models/` so the structure matches what `services/model_registry.py` expects:
 
 ```
-backend/models/animal/best_animal_cnn.pt
-backend/models/animal/animal_le.pkl
-backend/models/machine/machine_cnn14_best.pt
-backend/models/machine/machine_le.pkl
-backend/models/human/gender_cnn14_best.pt
-backend/models/human/gender_le.pkl
+backend/models/best_animal_cnn.pt
+backend/models/machine_cnn14_best.pt
+backend/models/gender_cnn14_best.pt
 ```
+
+**Alternative — download via script:**
+```bash
+pip install gdown
+gdown --folder https://drive.google.com/drive/folders/YOUR_FOLDER_ID -O backend/models
+```
+(Replace `YOUR_FOLDER_ID` with the ID from your Drive folder's share link — the part after `/folders/`.)
 
 ### 2. Run the backend
 
@@ -95,10 +84,10 @@ cd backend
 python -m venv venv
 source venv/bin/activate      # Windows: venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-python app.py
+python app.py                 # or: uvicorn app:app --reload
 ```
 
-Starts the API at `http://localhost:5000`. Works fine on CPU-only machines — no GPU required (falls back automatically if CUDA isn't available).
+Starts the API at `http://127.0.0.1:8000`. Works fine on CPU-only machines — no GPU required.
 
 ### 3. Run the frontend
 
@@ -108,25 +97,22 @@ npm install
 npm run dev
 ```
 
-Opens at `http://localhost:5173`. Upload a `.wav`/`.mp3` file and it's sent to the backend for classification.
+Opens at `http://127.0.0.1:5173`. Select a domain from the dropdown, upload a `.wav`/`.mp3` file, and it's sent to the backend for classification.
 
 ## API
 
-**`POST /api/classify`** — multipart form upload, field name `file`
+**`GET /`** — lists available models
+```json
+{ "message": "Whodat Audio Classification API", "available_models": ["animal", "machine", "human"] }
+```
+
+**`POST /predict/{model_name}`** — multipart form upload, field name `file`. `model_name` is one of `animal`, `machine`, `human`.
 
 Response:
 ```json
 {
-  "domain": "animal",
-  "predicted": "cow",
-  "confidence": 0.91,
-  "top3": [
-    { "label": "cow", "confidence": 0.91 },
-    { "label": "donkey", "confidence": 0.05 },
-    { "label": "sheep", "confidence": 0.02 }
-  ],
-  "router_probs": { "animal": 0.88, "machine": 0.07, "human": 0.05 },
-  "unknown": false
+  "prediction": "cow",
+  "confidence": 91.3
 }
 ```
 
@@ -134,11 +120,14 @@ Response:
 
 - **Models:** PyTorch, CNN14 (PANNs architecture), fine-tuned from AudioSet pretrained weights
 - **Audio processing:** librosa (log-mel spectrograms)
-- **Backend:** Flask, Flask-CORS
+- **Backend:** FastAPI
 - **Frontend:** React (Vite)
 
 ## Known limitations / next steps
 
-- All three specialist CNN14 models are assumed to share the same architecture and preprocessing (44100Hz, 256 mel bins, 5s duration) as the original animal/machine scaffold. If the human/gender model uses different preprocessing, its section of the pipeline needs its own config.
-- The router (`router_v2`) is trained on the same three datasets the specialists were trained on — its accuracy on audio meaningfully different from that distribution (background noise, overlapping sounds, non-English speech, etc.) hasn't been separately validated.
-- No hard "unknown/none of the above" class currently — very out-of-domain sounds (e.g. music) will still be forced into one of the three domains, just with a lower router probability.
+- Domain selection is manual — the user must know in advance whether their clip is an animal, machine, or human sound. See `SDLC.md` for the planned automatic-routing approach.
+- `test_preprocessing.py` is a manual print-and-check script rather than an automated `pytest` suite with real pass/fail assertions.
+- No CI pipeline currently runs tests automatically on push.
+- No hard "unknown/none of the above" handling — audio that doesn't fit any class in the selected domain will still be forced into one of that domain's classes.
+
+See `SDLC.md` for the full development process writeup.
