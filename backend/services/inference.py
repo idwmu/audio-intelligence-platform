@@ -48,7 +48,11 @@ def predict(model_name, audio_path):
     class_names = MODELS[model_name]["classes"]
 
     # Preprocess audio
+    # Preprocess audio
     mel = extract_mel(audio_path)
+
+    # Normalize to 0-1 range to match what the model was trained on
+    mel = (mel - mel.min()) / (mel.max() - mel.min() + 1e-8)
 
     mel = torch.tensor(
         mel,
